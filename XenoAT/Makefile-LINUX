@@ -35,7 +35,7 @@ SRC     = $(SOURCES)/$(TARGET)
 ASRC    = $(SOURCES)/qcode
 CFLAGS  = -mmcu=$(MCU) -I$(SOURCES) -g -Os -funsigned-char -funsigned-bitfields \
 	-fpack-struct -fshort-enums -Wall -Wstrict-prototypes -Wa,-ahlms
-ASFLAGS = -mmcu=$(MCU) -I$(SOURCES) -x assembler-with-cpp -Wa,-ahlms
+ASFLAGS = -mmcu=$(MCU) -I$(SOURCES) -Wa,-I.. -x assembler-with-cpp -Wa,-ahlms
 LDFLAGS = -Wl,-Map=$(SRC).map,--cref -lm
 ELFSIZE = $(SIZE) -A $(SRC).elf
 MOVE	= mv $(SOURCES)/$(TARGET).hex $(TARGET).hex
@@ -60,7 +60,7 @@ build:
 	$(MNAS) -a=$(SOURCES)/upload.lst -L $(SOURCES)/upload.S -o $(SOURCES)/upload.o
 	$(MNLD) -Ttext 0x40d000 -O $(MNELF) $(SOURCES)/upload.o -o $(SOURCES)/upload.elf
 	$(MNOBJCOPY) -O binary $(SOURCES)/upload.elf $(SOURCES)/upload.bin
-	$(CC) -c $(ASFLAGS)=$(ASRC).lst,-gstabs  $(ASRC).S -o $(ASRC).o
+	$(CC) -v -c $(ASFLAGS)=$(ASRC).lst,-gstabs  $(ASRC).S -o $(ASRC).o
 	$(BLDELF)
 	$(CC) $(CFLAGS)=$(SRC).o $(SRC).o  $(ASRC).o  --output $(SRC).elf $(LDFLAGS)
 	$(BLDHEX)

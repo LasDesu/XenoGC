@@ -18,7 +18,7 @@ linux-shell:
 	make -f XenoShell/Makefile-LINUX
 
 linux-hex:
-	make -f XenoAT/Makefile-LINUX
+	make -C XenoAT -f Makefile-LINUX
 
 linux-extra:
 	make -f XenoShell/Makefile-LINUX
@@ -41,7 +41,7 @@ windows-extra:
 ###########################################################################################
 # Clean WINDOWS / LINUX
 clean:
-	make clean -f XenoAT/Makefile-LINUX
+	make -C XenoAT -f Makefile-LINUX clean
 	make clean -f XenoShell/Makefile-LINUX
 
 ###########################################################################################
