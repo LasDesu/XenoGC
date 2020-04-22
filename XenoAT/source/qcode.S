@@ -16,14 +16,14 @@
 #--------------------------------------
  qcode:
 #--------------------------------------
-.incbin "XenoAT/source/qcode.bin"
+.incbin "source/qcode.bin"
 qcode_end:
 
 .align 2
 #--------------------------------------
  upload:
 #--------------------------------------
-.incbin "XenoAT/source/upload.bin"
+.incbin "source/upload.bin"
 upload_end:
 
 .align 2
@@ -31,11 +31,11 @@ upload_end:
  credits:
 #--------------------------------------
 .if CREDITS == 1
-#	.incbin "XenoAT/source/credits.bin"
-#	.incbin "XenoAT/source/sdload.bin"
-	.incbin "XenoAT/source/XenoShell.bin"
+#	.incbin "source/credits.bin"
+#	.incbin "source/sdload.bin"
+	.incbin "source/XenoShell.bin"
 .else
-	.incbin "XenoAT/source/NoCredits.bin"
+	.incbin "source/NoCredits.bin"
 .endif
 
 credits_end:

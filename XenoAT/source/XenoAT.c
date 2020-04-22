@@ -1,7 +1,8 @@
 #include <avr/io.h>
-#include <avr/signal.h>
 #include <avr/interrupt.h>
 #include <avr/pgmspace.h>
+#include <avr/power.h>
+#include <util/delay_basic.h>
 #include <math.h>
 #include <string.h>
 
@@ -15,11 +16,43 @@ typedef unsigned char  u8;
 #define RELEASE
 #define LOADER_ADDR 0x40D000
 
+/* NOTE: OUT,CLK,IN must be on the same port. */
+#ifdef __AVR_ATtiny85__
+
+#define X_OUT		_BV(4)
+#define X_OUT_PORT	PORTB
+#define X_OUT_PIN	PINB
+#define X_OUT_DDR	DDRB
+#define X_CLK		_BV(2)
+#define X_CLK_PORT	PORTB
+#define X_CLK_PIN	PINB
+#define X_CLK_DDR	DDRB
+#define X_IN		_BV(3)
+#define X_IN_PORT	PORTB
+#define X_IN_PIN	PINB
+#define X_IN_DDR	DDRB
+#define X_STR		_BV(5)
+#define X_STR_PORT	PORTB
+#define X_STR_PIN	PINB
+#define X_STR_DDR	DDRB
+
+#define LED1_PIN	_BV(0)
+#define LED2_PIN	_BV(1)
+
+#define LED_INIT  DDRB = LED1_PIN | LED2_PIN;
+
+// green
+#define LED1_ON   PORTB &= ~LED1_PIN
+#define LED1_OFF  PORTB |=  LED1_PIN
+// red
+#define LED2_ON   PORTB &= ~LED2_PIN
+#define LED2_OFF  PORTB |=  LED2_PIN
+
+#else
+
 #define VER2	// VER1 VER2
 
 
-
-/* NOTE: OUT,CLK,IN must be on the same port. */
 #ifdef VER1
 #define X_OUT 0x10
 #define X_OUT_PORT PORTB
@@ -75,6 +108,8 @@ typedef unsigned char  u8;
 
 #endif
 
+#endif
+
 extern const u8 qcode[];
 extern const u8* qcode_end;
 extern const u8 upload[];
@@ -88,13 +123,14 @@ void reset(void);
 void ldelay(volatile int i);
 
 
-inline void delay(void)
+static inline void delay(void)
 {
-	int i = 200;
-	while (i--);
+	/*int i = 200;
+	while (i--);*/
+	_delay_loop_1( 100 );
 }
 
-#ifndef RELEASE
+#if !defined(RELEASE) && !defined(__AVR_ATtiny85__)
 
 void USART_Init( unsigned int baud )
 {
@@ -124,6 +160,8 @@ void sputs( char* data )
 }
 
 #else
+#define USART_Init(x)
+#define USART_Transmit(x)
 #define sputs(x)
 #endif
 
@@ -145,29 +183,29 @@ void sputhex8(short c)
 	USART_Transmit(' ');
 }
 #else
-#define sputhex16(x)		x;
-#define sputhex8(x)			x;
+#define sputhex16(x)		(void)(x)
+#define sputhex8(x)			(void)(x)
 #endif
 
 //// xxx stuff
 
-int ndelay = 0;
+static unsigned char ndelay = 0;
 
 
-int io(char i)
+unsigned char io(char i)
 {
-	char res = 0;
+	unsigned char res = 0;
 
 	if (i)
-		X_OUT_PORT |= X_OUT;
+		X_OUT_PORT |=  X_OUT;
 	else
-		X_OUT_PORT &=~X_OUT;
+		X_OUT_PORT &= ~X_OUT;
 	
 	X_CLK_PORT &=~X_CLK; if (!ndelay) delay();
 	res = X_IN_PIN & X_IN;
 	X_CLK_PORT |= X_CLK; if (!ndelay) delay();
 	
-	return !!res;
+	return res;
 }
 
 void send8(unsigned char c)
@@ -192,7 +230,8 @@ unsigned char recv8(void)
 	{
 		if (!(X_STR_PIN & X_STR))
 			reset();
-		x |= io(0) << i;
+		if ( io(0) )
+			x |= 1 << i;
 	}
 	return x;
 }
@@ -201,8 +240,12 @@ unsigned char io8(unsigned char c)
 {
 	unsigned char x = 0;
 	int i;
+	
 	for (i=0; i<8; ++i)
-		x |= io(c & (1<<i)) << i;
+	{
+		if ( io(c & (1<<i)) )
+			x |= 1 << i;
+	}
 	return x;
 }
 
@@ -282,7 +325,7 @@ void write_word_norecv(long address, unsigned short data)
 	send8(0);
 }
 
-void write_block(long address, unsigned char *source, int len)
+void write_block(long address, const unsigned char *source, int len)
 {
 	while (len >= 1) {
 		write_word(address, pgm_read_byte(source) | (pgm_read_byte(source+1) << 8));
@@ -295,8 +338,19 @@ void write_block(long address, unsigned char *source, int len)
 void reset()
 {
 	sputs("RESET!\n");
-	WDTCR = 8;
+	WDTCR = (1<<WDE);
 	while (1);
+}
+
+static void WDT_off()
+{
+	__builtin_avr_wdr();
+	/* Clear WDRF in MCUSR */
+	MCUSR = 0x00;
+	/* Write logical one to WDCE and WDE */
+	WDTCR = (1<<WDCE) | (1<<WDE);
+	/* Turn off WDT */
+	WDTCR = 0x00;
 }
 
 void ldelay(volatile int i)
@@ -357,9 +411,12 @@ int main(void)
 	
 	int i;
 	X_OUT_PORT &= ~(X_CLK|X_OUT|X_IN);
-	X_STR_PORT |= X_STR;
-	X_OUT_DDR = 2 | X_CLK | X_OUT | 0x80;
 	X_STR_DDR &= ~X_STR;
+	//X_OUT_DDR = 2 | X_CLK | X_OUT | 0x80;
+	X_OUT_DDR |= X_CLK | X_OUT;
+	X_STR_PORT |= X_STR;
+	
+	WDT_off();
 	
 	// VCC/GND not present: no leds
 	// CLK missing: will be kept in first stage
@@ -371,30 +428,38 @@ int main(void)
 	// 0 1
 	LED2_ON; LED1_OFF; 	// -> red
 
+#if defined(__AVR_ATtiny85__)
+	// set 8MHz
+	clock_prescale_set( clock_div_1 );
+#endif
+
 	sputs("syncing..\n");
 	while (1) {
 		last_recv >>= 1;
-		last_recv |= io(1) ? 0x8000 : 0;
+		if ( io(1) )
+			last_recv |= 0x8000;
 //		sputhex16(last_recv); sputs("\n");
 		if (last_recv == 0xeeee)
-		  break;
+			break;
 	}
 	sputs("sync ok.\n");
 
 	// stack-friendly loading :p
-	static u8 PROGMEM pLoaderCode[] =	{	0x80, 0x00,					//  8000		MOV	$00,D0				
-											0xC4, 0xDA, 0xFC,			//  C4DAFC		MOVB	D0,($FCDA)	# disable breakpoints
-								
-											0xF4,0x74,0x74,0x0a,0x08,	//	F47474A708  MOV	$080a74,a0		# restore original 
-											0xF7,0x20,0x4C,0x80,		//	F7204C80    MOV	a0,($804c)		# inthandler
-											0xF4,0x74,					//	F47400D040  MOV	QCODEIMGBASE,a0	# jump to drivecode init
-											(LOADER_ADDR		& 0xFF),				
-											(LOADER_ADDR >> 8	& 0xFF),
-											(LOADER_ADDR >> 16	& 0xFF),		
-											0xF0,0x00					//	F000        JMP	(a0)
+	static const u8 PROGMEM pLoaderCode[] =
+	{
+		0x80, 0x00,					//  8000		MOV	$00,D0				
+		0xC4, 0xDA, 0xFC,			//  C4DAFC		MOVB	D0,($FCDA)	# disable breakpoints
+
+		0xF4,0x74,0x74,0x0a,0x08,	//	F47474A708  MOV	$080a74,a0		# restore original 
+		0xF7,0x20,0x4C,0x80,		//	F7204C80    MOV	a0,($804c)		# inthandler
+		0xF4,0x74,					//	F47400D040  MOV	QCODEIMGBASE,a0	# jump to drivecode init
+		(LOADER_ADDR		& 0xFF),				
+		(LOADER_ADDR >> 8	& 0xFF),
+		(LOADER_ADDR >> 16	& 0xFF),		
+		0xF0,0x00					//	F000        JMP	(a0)
 	};
 
-	u8* pUpload = qcode;
+	const u8* pUpload = qcode;
 	u16 wUploadSize = qcodesize;
 
 	u16 wTest = 0;

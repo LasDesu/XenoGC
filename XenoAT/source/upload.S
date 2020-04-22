@@ -7,8 +7,8 @@
 .equ ENTRY, 0x40c600
 
 /* helper macro for correct absolute 24bit jsrs */
-.macro jsrabsOrg addr			
-	jsr \addr-.+\addr
+.macro jsrabsOrg addr
+	jsr \addr - . + \addr
 .endm
 
 .macro P81_HI
@@ -54,7 +54,9 @@
 	jsr SUB_DownloadCode
 
  toEntry:
-	jsrabsOrg ENTRY					# jmp to drivecode 
+	#jsrabsOrg ENTRY					# jmp to drivecode 
+	mov ENTRY, a0
+	jsr (a0)
 
 #=======================================
  SUB_DownloadCode:
@@ -152,5 +154,4 @@
 
 	mov 0x80000, a0
 	jmp (a0)
-
 
