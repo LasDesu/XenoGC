@@ -12,7 +12,8 @@
 # MNDIR1 =  Path to MN10200 ELF GCC  < NOTE: NOT COMPATIBLE with MN10200 included in DEVKITPRO>
 #
 #
-MCU    = atmega8
+#MCU    = atmega8
+MCU    = attiny85
 AVRDIR = /opt/XenoTools/bin
 MNDIR  = /opt/XenoTools/mn10200_binutils/bin
 MNDIR1 = /opt/XenoTools/mn10200/bin
